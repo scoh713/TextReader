@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<style type='text/css'>
+.text {
+	width:99%;
+	height:100%;
+	background-color: #FFF8E1;
+	font-size:200%;
+	font-family:Helvetica; }
+
+.contents {
+	table-layout:auto;
+	overflow-y:scroll;
+	background-color: #FFF8E1;
+	color: #000000;
+	font-size: 30px;
+	font-family:Helvetica; }
+.ctrl {
+	line-height: 60px;
+	font-size: 40px;
+	vertical-align: middle; }
+.btn {
+	display: inline-block; 
+	padding: .1em .5em; 
+	color: #ffffff;
+	font-size: 50px;
+	border-radius: 25px;
+	border-width: 0px;
+	background-color: #696969; }
+.btn:hover { background-color: #000000; }
+.btn:active { background-color: #000000; }
+
+/* 탭 전체 스타일 */
+.tabs {
+  margin-top: 60px;
+  padding-bottom: 40px;
+  background-color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  width: 10px;
+  margin: 0 auto;}
+
+/* 탭 스타일 */
+.tab_item {
+  width: calc(100%/3);
+  height: 70px;
+  border-bottom: 3px solid #333333;
+  background-color: #f8f8f8;
+  line-height: 70px;
+  font-size: 60px;
+  text-align: center;
+  color: #333333;
+  display: block;
+  float: left;
+  text-align: center;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+.tab_item:hover {
+  opacity: 0.75;
+}
+
+/* 라디오 버튼 UI삭제*/
+input[name="tab_item"] {
+  display: none;
+}
+
+/* 탭 컨텐츠 스타일 */
+.tab_content {
+  display: none;
+  padding: 5px 5px 0;
+  clear: both;
+  overflow: hidden;
+}
+
+
+/* 선택 된 탭 콘텐츠를 표시 */
+#text:checked ~ #text_part,
+#speech:checked ~ #speech_part,
+#advertising:checked ~ #advertising_part {
+  display: block;
+}
+
+/* 선택된 탭 스타일 */
+.tabs input:checked + .tab_item {
+  background-color: #333333;
+  color: #fff;
+}
+</style>
+
+</head>
+
+<body style="background-color:#DCDCDC">
+<div class="tabs" id="frame" style="width:100%;">
+    <input id="text" type="radio" name="tab_item" checked>
+    <label class="tab_item" for="text">Text</label>
+    <input id="speech" type="radio" name="tab_item" onclick="compileText()">
+    <label class="tab_item" for="speech">Speech</label>
+    <input id="advertising" type="radio" name="tab_item">
+    <label class="tab_item" for="advertising">Ad.</label>
+
+    <div class="tab_content" id="text_part">
+	<textarea id="inputText" class="text" onchange="setTextChange()"></textarea>
+    </div>
+    <div class="tab_content" id="speech_part">
+	<table width="100%">
+	    <tr>
+		<td class="ctrl" width="45%" align="left"> <div id="sub_pos"> Position: 0 / N </div> </td>
+		<td class="ctrl" width="45%" align="right"> Speed <input type="range" id="playSpeed" min="0.5" max="1.25" step="0.25" value="1"> </td>
+		<td class="ctrl" width="10%" align="left"> <div id="speedLabel"> 1 </div> </td>
+	    </tr>
+	    <tr>
+		<td colspan=3> <div id="outputText" class="contents"/> </td>
+	    </tr>
+	</table>
+    </div>
+    <div class="tab_content" id="advertising_part">
+	<table style="width:100%;">
+	    <tr align="center">
+		<td> <a href="https://563e9chgr32pel4cwog6wdm480.hop.clickbank.net"> Puravive, </a> </td>
+		<td> <a href=""> The Genius Wave </a> </td>
+		<td> <a href=""> The Genius Wave </a> </td>
+	    </tr>
+	    <tr align="center">
+		<td> <a href=""> The Genius Wave </a> </td>
+		<td> <a href=""> The Genius Wave </a> </td>
+		<td> <a href=""> The Genius Wave </a> </td>
+	    </tr>
+	    <tr align="center">
+		<td> <a href=""> The Genius Wave </a> </td>
+		<td> <a href=""> The Genius Wave </a> </td>
+		<td> <a href=""> The Genius Wave </a> </td>
+	    </tr>
+	</table>
+    </div>
+</div>
+</body>
+
+<script type ="text/javascript">
+var	frame, playSpeed, speedLabel, leftButton, rightButton;
+var	outputText, inputText;
+var	cur_pos, last_pos, text_changed = false;
+var	parts = new Array();
+var	audio = new Audio();
+
+window.onload = function () {
+	playSpeed = document.getElementById("playSpeed");
+	playSpeed.addEventListener('change', changeSpeed, false);
+	frame = document.getElementById("frame");
+	speedLabel = document.getElementById("speedLabel");
+	outputText = document.getElementById("outputText");
+	inputText = document.getElementById('inputText');
+	cur_pos = 0;
+	window.addEventListener("resize", resizeWindow);
+	resizeWindow();
+}
+
+function	resizeWindow () {
+	frame.style.height = window.innerHeight - 60 + 'px';
+	inputText.style.height = frame.clientHeight - 90 + 'px';
+	outputText.style.height = frame.clientHeight - 160 + 'px';
+}
+
+function	Item (label) { this.label = label; }	// Item class
+function	setTextChange() { text_changed = true; }
+function	doCopyPart (pos) { navigator.clipboard.writeText(parts[pos].label); }
+function	changeSpeed (e) { setSpeed(playSpeed.valueAsNumber); }
+
+function	doPlayPart (pos) {	// play at pos_start
+	lang = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(parts[pos].label) ? "ko" : "en";
+	textEncoded = encodeURIComponent(parts[pos].label);
+	url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=` + lang + `&client=tw-ob&q=${textEncoded}`;
+
+	audio.src = url;
+	audio.play();
+	audio.playbackRate = playSpeed.valueAsNumber;
+
+	if (cur_pos != pos) {
+		cur_pos = pos;
+		document.getElementById('sub_pos').innerHTML = 
+			"Position: " + cur_pos + " / " + last_pos;
+		doCopyPart(cur_pos);
+	}
+}
+
+function	playPrev () { if (1 < cur_pos)  doPlayPart(cur_pos-1); }
+function	playCur () { doPlayPart(cur_pos); }
+function	playNext () { if (cur_pos < last_pos) doPlayPart(cur_pos+1); }
+
+function	setSpeed (speed) {
+	audio.playbackRate = speed;
+	speedLabel.innerHTML = "" + speed;
+	playSpeed.value = speed;
+}
+
+function	compileText () {
+	if (text_changed == false) return;
+	text_changed = false;
+
+	function	findAllParts(str) {
+		EoS = ['. ', '? ', '! ', '." ', '?" ', '!" ', '," ', ': ', '—', '\n'];
+		//SPS = [' ', '\n'];
+		const indices = [];
+		left = 0;
+
+		// find sentences
+		for (j = 0; j < EoS.length; j++) {
+			patlen = EoS[j].length;
+			idx = str.indexOf(EoS[j]);
+			while (idx != -1) {
+				indices.push(idx+patlen);
+				idx = str.indexOf(EoS[j], idx+1);
+			}
+		}
+		indices.push(str.length);
+		indices.sort((a,b) => a-b);
+
+		// split long verses
+		N = indices.length;
+		for (j = 0; j < N; j++) {
+			left = (j == 0) ? 0 : indices[j-1];
+			right = indices[j];
+			for (i = left; i < right; i++)
+				if (str[i] == ',' && left+15 < i && i < right-15) {
+					indices.push(i+1);
+					left = i+1;
+				}
+			left = indices[j] + 1;
+		}
+		indices.sort((a,b) => a-b);
+
+		return indices;
+	}
+	function	add_text(i, s, parts) {
+		parts[i] = new Item(s);
+		return "<tr> <td>" + i.toString() + "</td>" + "<td> <a class='btn' onclick=\"doPlayPart("+i+");\">"+s+"</a> </td></tr>";
+	}
+
+	var	text = document.getElementById('inputText').value;
+	var	tags = "<table>";
+	var	n = 0;
+
+	// split parts
+	idx = findAllParts(text);
+	
+	// assemble the tags
+	var left = 0;
+	for (i = 0; i < idx.length; i++) {
+		right = idx[i];
+		var sent = text.substring(left, right).trim();
+		left = right;
+		if (sent) {
+			n += 1;
+			tags += add_text(n, sent, parts);
+		}
+	}
+	last_pos = n;
+
+	if (cur_pos > last_pos) cur_pos = last_pos;
+	outputText.innerHTML = tags;
+}
+
+</script>
+</html>
